@@ -1,0 +1,15 @@
+[Unit]
+Description=KAWA Script runner Service
+After=kawa
+StartLimitIntervalSec=0
+[Service]
+Type=simple
+Restart=on-failure
+RestartSec=5
+StartLimitIntervalSec=120
+StartLimitBurst=10 
+User=kawa-system
+ExecStart=/bin/bash /usr/local/bin/kawa-python-runner.sh
+
+[Install]
+WantedBy=multi-user.target

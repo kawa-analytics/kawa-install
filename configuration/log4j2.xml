@@ -1,0 +1,30 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<Configuration>
+    <Properties>
+	    <Property name="basePath">/var/log/kawa</Property>
+    </Properties>
+    <Appenders>
+        <RollingFile name="File" fileName="${basePath}/kawa-standalone.log" filePattern="${basePath}/kawa-%d{yyyy-MM-dd}.log">
+            <PatternLayout>
+                <pattern>(%X) %-5level %d{HH:mm:ss.SSS}  %logger{36} - %msg%n</pattern>
+            </PatternLayout>
+            <Policies>
+                <TimeBasedTriggeringPolicy interval="1" modulate="true"/>
+            </Policies>
+        </RollingFile>
+    </Appenders>
+    <Loggers>
+        <Logger name="org.quartz.plugins" level="WARN">
+            <AppenderRef ref="File"/>
+        </Logger>
+        <Logger name="org.mongodb" level="INFO">
+            <AppenderRef ref="File"/>
+        </Logger>
+        <Logger name="com.zaxxer.hikari.HikariConfig" level="INFO">
+            <AppenderRef ref="File"/>
+        </Logger>
+        <Root level="INFO">
+            <AppenderRef ref="File"/>
+        </Root>
+    </Loggers>
+</Configuration>

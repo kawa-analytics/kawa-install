@@ -1,0 +1,15 @@
+[Unit]
+Description=KAWA Service
+After=clickhouse-server.service postgresql@16-main.service
+StartLimitIntervalSec=0
+[Service]
+Type=simple
+Restart=always
+RestartSec=5
+StartLimitIntervalSec=120
+StartLimitBurst=10 
+User=kawa-system
+ExecStart=/bin/bash /usr/local/bin/kawa.sh
+
+[Install]
+WantedBy=multi-user.target
