@@ -104,6 +104,8 @@ sudo systemctl status kawa
 sudo systemctl status kawa-python-runner
 ```
 
+You can use `stop`, `start` and `restart` to control the services.
+
 ### 4.a Log files
 
 The log files can be found here: `/var/log/kawa`.
@@ -122,3 +124,14 @@ The `/var/lib/kawa` will contain user data such as scripts and uploaded csvs.
 Please make sure that it contains enough space.
 
 
+### 4.d Configuring other warehouses
+
+KAWA is compatible with the following data warehouses/data lakes:
+- Clickhouse
+- Snowflake
+- Trino
+- Big Query
+- Starrocks
+
+In order to configure them, please refer to the `kawa.env` files, which contains more details.
+Please contact support@kawa.ai for assistance regarding this configuration.
