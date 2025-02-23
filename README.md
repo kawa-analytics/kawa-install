@@ -94,4 +94,31 @@ Follow the README and then:  [Initial setup Notebook](https://github.com/kawa-an
 
 ## 4. Exploitation
 
+Please refer to the full documentation here: https://github.com/kawa-analytics/kawa-docker-install
+
+The KAWA Server and the KAWA Python runner are both started with the `kawa-system` user.
+Both are started as systemd services.
+
+```bash
+sudo systemctl status kawa
+sudo systemctl status kawa-python-runner
+```
+
+### 4.a Log files
+
+The log files can be found here: `/var/log/kawa`.
+- The server is generating the `kawa-standalone.log` file.
+- The python runner: `kawapythonserver.log`.
+
+### 4.b Configuration files
+
+They are located in the `/etc/kawa` directory.
+The main parameters are located in the `kawa.env` file.
+
+
+### 4.c User data
+
+The `/var/lib/kawa` will contain user data such as scripts and uploaded csvs.
+Please make sure that it contains enough space.
+
 
