@@ -3,7 +3,7 @@
 CONFIG_DIR=/etc/kawa
 TOKEN_FILE=$CONFIG_DIR/deploy.token
 TOKEN=`cat $TOKEN_FILE`
-BRANCH="1.29.x"
+BRANCH="1.30.x"
 REGISTRY_URL=https://gitlab.com/api/v4/projects/26911065/packages/generic/kawa
 PATH_TO_JAR=/var/lib/kawa/kawa.jar
 
