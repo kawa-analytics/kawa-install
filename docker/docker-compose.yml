@@ -1,0 +1,138 @@
+services:
+  kawa-script-runner:
+    image: ${KAWA_SCRIPT_RUNNER_IMAGE_PATH}
+    pull_policy: ${KAWA_SCRIPT_RUNNER_PULL_POLICY}
+    ports:
+      - ${KAWA_SCRIPT_RUNNER_EXTERNAL_PORT}:8815
+    environment:
+      KAWA_URL: ${KAWA_SERVER_URL}:8080
+      KAWA_AUTOMATION_SERVER_AES_KEY: ${KAWA_RUNNER_AES_KEY}
+      KAWA_AUTOMATION_SERVER_SCRIPT_TIMEOUT_IN_SECONDS: 1800
+      # Custom python package registry (optional). KW_PEX_USE_PIP_CONFIG
+      # must be empty to disable (any value, even "false", enables it).
+      KW_PEX_USE_PIP_CONFIG: ${KW_PEX_USE_PIP_CONFIG}
+      PIP_INDEX_URL: ${PIP_INDEX_URL}
+    env_file:
+      - path: kawa.script-runner.env
+        required: false
+  
+  kawa-server:
+    image: ${KAWA_SERVER_IMAGE_PATH}
+    pull_policy: ${KAWA_SERVER_PULL_POLICY}
+    ports:
+      - ${KAWA_SERVER_EXTERNAL_PORT}:8080
+    volumes:
+      - kawadata:/home/kawa/user-files
+      - ./server.crt:/home/kawa/server.crt
+      - ./server.key:/home/kawa/server.key
+      - ./workflow-private-key.pem:/home/kawa/workflow-private-key.pem
+    environment:
+      KAWA_EMAIL_IS_ENABLED: true
+      KAWA_SERVER_URL: ${KAWA_SERVER_EXTERNAL_URL}
+      KAWA_GLOBAL_RUNNER_AES_KEY: ${KAWA_RUNNER_AES_KEY}
+      KAWA_DEFAULT_RUNNER_AES_KEY: ${KAWA_RUNNER_AES_KEY}
+      KAWA_LANGCHAIN_CONFIGURATION: ${KAWA_SERVER_LANGCHAIN_CONFIGURATION}
+      KAWA_FILE_STORE_DIRECTORY: /home/kawa/user-files/local
+      KAWA_SMTP_USERNAME: ${KAWA_SMTP_USERNAME}
+      KAWA_SMTP_PASSWORD: ${KAWA_SMTP_PASSWORD}
+      KAWA_PRIVATE_KEY_PATH: /home/kawa/workflow-private-key.pem
+      KAWA_PATH_TO_SERVER_CERTIFICATE: /home/kawa/server.crt
+      KAWA_PATH_TO_SERVER_PRIVATE_KEY: /home/kawa/server.key
+      KAWA_BYPASS_VAULT: true
+      KAWA_HTTPS: ${KAWA_SERVER_HTTPS}
+      KAWA_OAUTH2_CLIENT_SECRET: ${KAWA_OAUTH2_CLIENT_SECRET}
+      KAWA_POSTGRES_JDBC_URL: ${KAWA_POSTGRES_JDBC_URL}
+      KAWA_CLICKHOUSE_JDBC_URL: ${KAWA_CLICKHOUSE_JDBC_URL}
+      KAWA_ACCESS_TOKEN_SECRET: ${KAWA_ACCESS_TOKEN_SECRET}
+      KAWA_REFRESH_TOKEN_SECRET: ${KAWA_REFRESH_TOKEN_SECRET}
+      KAWA_ENCRYPTION_IV: ${KAWA_ENCRYPTION_IV}
+      KAWA_ENCRYPTION_KEY: ${KAWA_ENCRYPTION_KEY}
+      KAWA_CLICKHOUSE_IS_POST_23_DOT_8: true
+      KAWA_CLICKHOUSE_ALLOW_LIVE_CONNECT: true
+      KAWA_CLICKHOUSE_INTERNAL_DATABASE: ${KAWA_CLICKHOUSE_INTERNAL_DATABASE}
+      KAWA_WAREHOUSE_TYPE: ${KAWA_WAREHOUSE_TYPE}
+      KAWA_ENTITY_CACHE_IS_ENABLED: true
+
+    env_file:
+      - path: kawa.server.env
+        required: false
+    logging:
+      driver: json-file
+      options:
+        max-size: 50m
+        max-file: 5
+
+  kawa-workflow:
+    image: ${KAWA_WORKFLOW_IMAGE_PATH}
+    pull_policy: ${KAWA_WORKFLOW_PULL_POLICY}
+    environment:
+      KAWA_WORKFLOW_JDBC_URL: ${KAWA_WORKFLOW_JDBC_URL}
+      APP_AUTH_CLIENTS_KAWA: ${KAWA_WORKFLOW_KAWA_PUBLIC_KEY}
+    volumes:
+      - ./workflow.properties:/home/kawa/application.properties
+    ports:
+      - ${KAWA_WORKFLOW_EXTERNAL_PORT}:8088
+    env_file:
+      - path: kawa.workflow.env
+        required: false
+
+  clickhouse:
+    image: "clickhouse/clickhouse-server:24.8.12-alpine"
+    profiles:
+      - clickhouse
+    volumes:
+      - clickhousedata:/var/lib/clickhouse
+      - ./assets/backup:/backups
+      - /tmp/clickhouse-server:/var/log/clickhouse-server
+      - ./assets/users.d:/etc/clickhouse-server/users.d
+      - ./assets/config.d:/etc/clickhouse-server/config.d
+    ports:
+      - ${CLICKHOUSE_EXTERNAL_PORT}:8123
+      - ${CLICKHOUSE_EXTERNAL_TCP_PORT}:9000
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+    env_file:
+      - path: clickhouse.env
+        required: false
+
+  postgres:
+    image: "postgres:13.12-alpine"
+    environment:
+      POSTGRES_USER: ${KAWA_DB_USER}
+      POSTGRES_PASSWORD: ${KAWA_DB_PASSWORD}
+      POSTGRES_DB: ${KAWA_SERVER_DB_NAME}
+      KAWA_WORKFLOW_DB_NAME: ${KAWA_WORKFLOW_DB_NAME}
+      KAWA_WORKFLOW_SCHEMA_NAME: ${KAWA_WORKFLOW_SCHEMA_NAME}
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+      - ./init-postgres.sh:/docker-entrypoint-initdb.d/init-postgres.sh
+    ports:
+      - ${POSTGRES_EXTERNAL_PORT}:5432
+    env_file:
+      - path: postgres.env
+        required: false
+
+volumes:
+  pgdata:
+    driver: local
+    driver_opts:
+      type: none
+      device: ${MOUNT_DIRECTORY}/pgdata
+      o: bind
+  clickhousedata:
+    driver: local
+    driver_opts:
+      type: none
+      device: ${MOUNT_DIRECTORY}/clickhousedata
+      o: bind
+  kawadata:
+    driver: local
+    driver_opts:
+      type: none
+      device: ${MOUNT_DIRECTORY}/kawadata
+      o: bind
+
+networks:
+  default:
+    name: ${KAWA_DOCKER_COMPOSE_NETWORK_NAME}
+    driver: ${KAWA_DOCKER_COMPOSE_NETWORK_DRIVER}

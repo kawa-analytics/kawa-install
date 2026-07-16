@@ -1,0 +1,31 @@
+<clickhouse>
+    <profiles>
+        <default>
+             <max_memory_usage>0</max_memory_usage>
+             <max_table_size_to_drop>0</max_table_size_to_drop>
+        </default>
+    </profiles>
+    <users>
+        <kawa>
+<password_sha256_hex>9009eda05e39026fbd778844e0f14693736120f387a1fb53e10c000dc4e9923c</password_sha256_hex>
+            <networks>
+                <ip>::/0</ip>
+            </networks>
+            <profile>default</profile>
+            <quota>default</quota>
+        </kawa>
+    </users>
+
+    <quotas>
+        <default>
+            <interval>
+                <duration>3600</duration>
+                <queries>0</queries>
+                <errors>0</errors>
+                <result_rows>0</result_rows>
+                <read_rows>0</read_rows>
+                <execution_time>0</execution_time>
+            </interval>
+        </default>
+    </quotas>
+</clickhouse>

@@ -1,83 +1,187 @@
 #/bin/bash
 
-KAWA_USER=kawa-system
-CONFIG_DIR=/etc/kawa
-LOG_DIR=/var/log/kawa
-VAR_DIR=/var/lib/kawa
-BIN_DIR=/usr/local/bin
+# =====================================================================
+# KAWA installer. Two installation modes are available:
+#
+#   sudo ./install.sh --mode=native   Runs directly on the machine (systemd)
+#   sudo ./install.sh --mode=docker   Runs with docker compose
+#
+# And one maintenance command:
+#
+#   sudo ./install.sh --mode=configure
+#       Re-applies the application configuration after a change
+#       to the kawa.config file (features, SMTP, OIDC, ...)
+#
+# Both modes share the same configuration pieces:
+#   - configuration/kawa-registry.credentials  (registry access)
+#   - configuration/kawa.config                (the KAWA configuration)
+#   - configuration/kawa.secrets               (ALL the secrets)
+#   - the kywy-based configuration step (lib/kawa-configure.sh)
+#
+# Without --mode, the installer runs interactively.
+# Automation: --mode=<m> --interactive=false [--version=<v>]
+# Any other flag is passed through to the mode-specific installer.
+# =====================================================================
 
-if [ "$USER" != "root" ]; then
-    echo "Please run as root"
-    exit
+cd "$(dirname "$0")"
+
+CONFIG_DIR=configuration
+CREDENTIALS_FILE=$CONFIG_DIR/kawa-registry.credentials
+
+# ---------------------------------------------------------------------
+# Cosmetics
+# ---------------------------------------------------------------------
+if [ -t 1 ]; then
+    BOLD=$(tput bold); CYAN=$(tput setaf 6); GREEN=$(tput setaf 2)
+    YELLOW=$(tput setaf 3); RESET=$(tput sgr0)
+else
+    BOLD=""; CYAN=""; GREEN=""; YELLOW=""; RESET=""
 fi
 
-# Create the kawa-system user and group
-id -u $KAWA_USER >/dev/null 2>&1 || adduser --disabled-password --gecos "" $KAWA_USER
+step() {
+    echo ""
+    echo "${BOLD}${CYAN}==> $1${RESET}"
+}
 
-# Create kawa directories
-mkdir -p --mode 700 $CONFIG_DIR $LOG_DIR $VAR_DIR/files $VAR_DIR/drivers
-chown -R $KAWA_USER $CONFIG_DIR $LOG_DIR $VAR_DIR
-chgrp -R $KAWA_USER $CONFIG_DIR $LOG_DIR $VAR_DIR
+ask() { # ask "question" "default" -> $REPLY
+    read -r -p "    $1 [$2]: " REPLY
+    REPLY=${REPLY:-$2}
+}
 
-# Copy the files: Binary
-cp lib/kawa.sh $BIN_DIR
-cp lib/kawa-python-runner.sh $BIN_DIR
+set_config() { # set_config KEY value - persists a value into kawa.config
+    sed -i "s|^$1=.*|$1=\"$2\"|" $CONFIG_DIR/kawa.config
+}
 
-chown $KAWA_USER $BIN_DIR/kawa.sh $BIN_DIR/kawa-python-runner.sh
-chgrp $KAWA_USER $BIN_DIR/kawa.sh $BIN_DIR/kawa-python-runner.sh
-chmod 700 $BIN_DIR/kawa.sh $BIN_DIR/kawa-python-runner.sh
+# ---------------------------------------------------------------------
+# Arguments
+# ---------------------------------------------------------------------
+MODE=""
+interactive="true"
+ARGS=()
+for arg in "$@"; do
+    case $arg in
+        --mode=*) MODE="${arg#*=}" ;;
+        --interactive=*) interactive="${arg#*=}"; ARGS+=("$arg") ;;
+        *) ARGS+=("$arg") ;;
+    esac
+done
+[ -t 0 ] || interactive="false"
 
-
-# Copy the files: Configuration
-cp configuration/*.* $CONFIG_DIR
-if [ ! -f $CONFIG_DIR/kawa.pwd ]; then
-    sudo sh -c 'tr -dc A-Za-z0-9 </dev/urandom | head -c 20  > /etc/kawa/kawa.pwd'
+# ---------------------------------------------------------------------
+# Maintenance command: re-apply the application configuration
+# ---------------------------------------------------------------------
+if [ "$MODE" == "configure" ]; then
+    bash lib/kawa-configure.sh
+    echo ""
+    echo "Restart the KAWA server to take the new configuration into account:"
+    if [ -f /etc/kawa/kawa.config ]; then
+        echo "  sudo systemctl restart kawa"
+    else
+        echo "  (cd docker && docker compose restart kawa-server)"
+    fi
+    exit 0
 fi
-chown $KAWA_USER $CONFIG_DIR/*.*
-chgrp $KAWA_USER $CONFIG_DIR/*.*
-chmod 600 $CONFIG_DIR/*.*
-chmod 600 $CONFIG_DIR/*.*
 
-# Install dependencies
-sudo apt-get install -y apt-transport-https ca-certificates dirmngr
-curl -fsSL 'https://packages.clickhouse.com/rpm/lts/repodata/repomd.xml.key' | sudo gpg --dearmor -o /usr/share/keyrings/clickhouse-keyring.gpg
+echo "${CYAN}${BOLD}"
+echo "  =============================================="
+echo "        K A W A   -   I N S T A L L E R"
+echo "  =============================================="
+echo "${RESET}"
 
-ARCH=$(dpkg --print-architecture)
-echo "deb [signed-by=/usr/share/keyrings/clickhouse-keyring.gpg arch=${ARCH}] https://packages.clickhouse.com/deb stable main" | sudo tee /etc/apt/sources.list.d/clickhouse.list
-sudo apt-get update
-sudo apt-get install -yqq \
-    postgresql-16 \
-    clickhouse-server \
-    clickhouse-client \
-    openjdk-21-jre-headless \
-    python3.12 \
-    python3-pip \
-    python3.12-venv \
-    pipx
+# ---------------------------------------------------------------------
+# 1. Installation mode
+# ---------------------------------------------------------------------
+if [ -z "$MODE" ]; then
+    if [ "$interactive" != "true" ]; then
+        echo "Please specify a mode: --mode=native or --mode=docker"
+        exit 1
+    fi
+    step "Installation mode"
+    echo "    1) native - directly on this machine, as systemd services"
+    echo "    2) docker - as docker compose services (recommended)"
+    read -r -p "    Please choose [1/2]: " choice
+    case $choice in
+        1) MODE=native ;;
+        2) MODE=docker ;;
+        *) echo "Invalid choice"; exit 1 ;;
+    esac
+fi
 
-# Configure Postgres: Add the kawa user and grant them the rquired permissions
-echo "Creating KAWA user in Postgres"
-sudo -u postgres createuser kawa
-sudo -u postgres createdb kawa
-sudo -u postgres psql  -c "ALTER USER kawa WITH ENCRYPTED PASSWORD '$(cat $CONFIG_DIR/kawa.pwd)'"
-sudo -u postgres psql  -c "GRANT ALL PRIVILEGES ON DATABASE kawa TO kawa"
+if [ "$MODE" != "native" ] && [ "$MODE" != "docker" ]; then
+    echo "Unknown mode: $MODE (expected native, docker or configure)"
+    exit 1
+fi
+echo "    Mode: ${GREEN}$MODE${RESET}"
 
-# Configure Clickhouse
-echo "Creating KAWA user in Clickhouse"
-sudo service clickhouse-server start
-sudo sed -i '/access_management/ s/<!--//' /etc/clickhouse-server/users.xml
-sudo sed -i '/access_management/ s/-->//' /etc/clickhouse-server/users.xml
-clickhouse-client --password --multiquery -q "CREATE USER kawa IDENTIFIED WITH sha256_password BY '$(cat $CONFIG_DIR/kawa.pwd)'; CREATE DATABASE kawa; GRANT ALL ON kawa TO kawa; GRANT ALL ON kawa.* TO kawa;"
+# ---------------------------------------------------------------------
+# 2. Registry access (GitLab deploy token)
+# ---------------------------------------------------------------------
+step "Registry access"
+CURRENT_TOKEN_NAME=$(head -1 "$CREDENTIALS_FILE" 2>/dev/null)
+if [ -z "$CURRENT_TOKEN_NAME" ] || [ "$CURRENT_TOKEN_NAME" == "token-name" ]; then
+    if [ "$interactive" != "true" ]; then
+        echo "Please input your registry credentials in $CREDENTIALS_FILE"
+        echo "(first line: token name, second line: token value)"
+        exit 1
+    fi
+    echo "    Your GitLab registry credentials were provided by the KAWA support team."
+    read -r -p "    Token name: " TOKEN_NAME
+    read -r -s -p "    Token value (gldt-...): " TOKEN_VALUE
+    echo ""
+    printf '%s\n%s\n' "$TOKEN_NAME" "$TOKEN_VALUE" > "$CREDENTIALS_FILE"
+    chmod 600 "$CREDENTIALS_FILE"
+    echo "    Credentials saved in $CREDENTIALS_FILE"
+else
+    echo "    Using the existing credentials '$CURRENT_TOKEN_NAME' (from $CREDENTIALS_FILE)"
+fi
 
-# Create the linux services
-# The KAWA server
-cp lib/kawa.service /etc/systemd/system
-systemctl start kawa
-systemctl enable kawa
+# ---------------------------------------------------------------------
+# 3. Version
+# ---------------------------------------------------------------------
+. $CONFIG_DIR/kawa.config
+if [ "$interactive" == "true" ]; then
+    step "Version"
+    if [ "$MODE" == "native" ]; then
+        ask "KAWA version - exact JAR version (eg. 1.35.1)" "$KAWA_JAR_VERSION"
+        set_config KAWA_JAR_VERSION "$REPLY"
+    else
+        ask "KAWA version - docker image tag (eg. 1.35.x)" "$KAWA_DOCKER_VERSION"
+        set_config KAWA_DOCKER_VERSION "$REPLY"
+    fi
+    echo "    Version: ${GREEN}$REPLY${RESET}"
+fi
 
-# The script runner
-cp lib/kawa-python-runner.service /etc/systemd/system
-systemctl start kawa-python-runner
-systemctl enable kawa-python-runner
+# ---------------------------------------------------------------------
+# 4. Admin account
+# ---------------------------------------------------------------------
+if [ ! -f $CONFIG_DIR/admin.pwd ] && [ ! -f /etc/kawa/admin.pwd ] && [ "$interactive" == "true" ]; then
+    step "Admin account (setup-admin@kawa.io)"
+    while true; do
+        read -r -s -p "    Choose the admin password: " ADMIN_PASSWORD_1
+        echo ""
+        read -r -s -p "    Confirm the admin password: " ADMIN_PASSWORD_2
+        echo ""
+        if [ -z "$ADMIN_PASSWORD_1" ]; then
+            echo "    ${YELLOW}The password cannot be empty.${RESET}"
+        elif [ "$ADMIN_PASSWORD_1" != "$ADMIN_PASSWORD_2" ]; then
+            echo "    ${YELLOW}The passwords do not match, please try again.${RESET}"
+        else
+            break
+        fi
+    done
+    printf '%s' "$ADMIN_PASSWORD_1" > $CONFIG_DIR/admin.pwd
+    chmod 600 $CONFIG_DIR/admin.pwd
+fi
 
-
+# ---------------------------------------------------------------------
+# 5. Hand over to the mode-specific installer
+# ---------------------------------------------------------------------
+step "Installing KAWA ($MODE mode)"
+case $MODE in
+    native)
+        bash native/install-native.sh "${ARGS[@]}"
+        ;;
+    docker)
+        bash docker/install-docker.sh "${ARGS[@]}"
+        ;;
+esac

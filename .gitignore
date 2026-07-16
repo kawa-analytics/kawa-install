@@ -1,1 +1,11 @@
 .DS_Store
+docker/.env
+docker/data/
+docker/server.crt
+docker/server.key
+docker/workflow-private-key.pem
+docker/workflow-public-key.pem
+configuration/admin.pwd
+kywy-venv/
+__pycache__/
+configuration/kawa-registry.credentials
