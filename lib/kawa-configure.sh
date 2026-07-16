@@ -1,4 +1,4 @@
-#/bin/bash
+#!/bin/bash
 #
 # Applies the KAWA application configuration (features, SMTP, OIDC,
 # workflow engine, admin password) from kawa.config, using the kywy

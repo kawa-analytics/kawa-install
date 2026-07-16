@@ -1,4 +1,4 @@
-#/bin/bash
+#!/bin/bash
 
 CONFIG_DIR=/etc/kawa
 LOG_DIR=/var/log/kawa

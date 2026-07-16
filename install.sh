@@ -1,4 +1,4 @@
-#/bin/bash
+#!/bin/bash
 
 # =====================================================================
 # KAWA installer. Two installation modes are available:

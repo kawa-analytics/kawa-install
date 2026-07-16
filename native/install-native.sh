@@ -1,4 +1,4 @@
-#/bin/bash
+#!/bin/bash
 
 # =====================================================================
 # KAWA installation - NATIVE mode (systemd services, no docker).

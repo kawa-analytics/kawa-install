@@ -1,4 +1,4 @@
-#/bin/bash
+#!/bin/bash
 
 CONFIG_DIR=/etc/kawa
 TOKEN_FILE=$CONFIG_DIR/deploy.token
