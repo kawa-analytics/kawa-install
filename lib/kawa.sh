@@ -21,7 +21,7 @@ fi
 chmod 600 $PATH_TO_JAR
 
 java --add-opens=java.base/java.nio=ALL-UNNAMED \
-  -Xmx8g \
+  -Xmx4g \
   -XX:-OmitStackTraceInFastThrow \
   -XX:+HeapDumpOnOutOfMemoryError \
   -XX:+UseZGC \
