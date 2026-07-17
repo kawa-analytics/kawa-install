@@ -85,13 +85,33 @@ if [ "$USE_RIYU" == "true" ]; then
         echo "USE_RIYU=true requires OIDC: please fill in the OIDC section of kawa.config (USE_OIDC=true)"
         exit 1
     fi
-    if [ ! -f "$RIYU_GCP_KEY_PATH" ]; then
-        echo "USE_RIYU=true requires a GCP service account key with Vertex AI access:"
-        echo "please set RIYU_GCP_KEY_PATH in kawa.config"
-        exit 1
+
+    if [ "${RIYU_AI_PROVIDER:-vertex}" == "anthropic" ]; then
+        # Anthropic API: an API key, no GCP credentials
+        if [ -z "$ANTHROPIC_API_KEY" ]; then
+            echo "RIYU_AI_PROVIDER=anthropic requires an Anthropic API key:"
+            echo "please set ANTHROPIC_API_KEY in kawa.secrets"
+            exit 1
+        fi
+        RIYU_SMALL_MODEL=${RIYU_SMALL_MODEL:-anthropic/claude-haiku-4-5-20251001}
+        RIYU_MEDIUM_MODEL=${RIYU_MEDIUM_MODEL:-anthropic/claude-sonnet-4-6}
+        RIYU_LARGE_MODEL=${RIYU_LARGE_MODEL:-anthropic/claude-opus-4-8}
+        # The compose file mounts this path: keep an empty placeholder
+        touch ./gcp.json
+    else
+        # Google Vertex AI: a GCP service account key
+        if [ ! -f "$RIYU_GCP_KEY_PATH" ]; then
+            echo "RIYU_AI_PROVIDER=vertex requires a GCP service account key with Vertex AI access:"
+            echo "please set RIYU_GCP_KEY_PATH in kawa.config"
+            exit 1
+        fi
+        cp "$RIYU_GCP_KEY_PATH" ./gcp.json
+        chmod 644 ./gcp.json
+        RIYU_SMALL_MODEL=${RIYU_SMALL_MODEL:-google-vertex-anthropic/claude-haiku-4-5@20251001}
+        RIYU_MEDIUM_MODEL=${RIYU_MEDIUM_MODEL:-google-vertex-anthropic/claude-sonnet-4-6@default}
+        RIYU_LARGE_MODEL=${RIYU_LARGE_MODEL:-google-vertex-anthropic/claude-opus-4-8@default}
     fi
-    cp "$RIYU_GCP_KEY_PATH" ./gcp.json
-    chmod 644 ./gcp.json
+    echo "Riyu AI provider: ${RIYU_AI_PROVIDER:-vertex} (models: $RIYU_SMALL_MODEL, $RIYU_MEDIUM_MODEL, $RIYU_LARGE_MODEL)"
     COMPOSE_PROFILES="riyu"
 fi
 

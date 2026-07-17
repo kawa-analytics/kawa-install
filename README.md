@@ -10,7 +10,7 @@ Two installation modes are available in the same package — pick the one that f
 | Postgres / ClickHouse | Installed from APT packages | Official docker images |
 | KAWA server & workflow engine | Standalone JARs from the KAWA registry | Docker images from the KAWA registry |
 | Script runner | `kawapythonserver` python package | Docker image |
-| Riyu (AI co-builder) | Not available | Optional (requires OIDC + Vertex AI) |
+| Riyu (AI co-builder) | Not available | Optional (requires OIDC + Vertex AI or an Anthropic API key) |
 | Version format | Exact JAR version (eg. `1.35.1`) | Image tag, branch form (eg. `1.35.x`) |
 | Requires | Ubuntu 20.04/22.04/24.04 LTS, root access | Any Linux with docker + docker compose |
 
@@ -321,21 +321,36 @@ Riyu is KAWA's AI co-builder. It runs as an additional docker compose service, w
 ### 5.a Requirements
 
 1. **OIDC configured** (section 3.b), plus one extra step on your identity provider: register the additional redirect URI **`<RIYU_EXTERNAL_URL>/auth/callback`** (e.g. `https://riyu.wayne.com/auth/callback`) on the same OIDC application.
-2. **A GCP service account key** (json file) with **Vertex AI access** (`roles/aiplatform.user`) in a project where the Claude models are enabled. Google Vertex AI is the only supported AI provider for now.
+2. **An AI provider**, one of:
+   - **Google Vertex AI** (`RIYU_AI_PROVIDER=vertex`, the default): a GCP service account key (json file) with **Vertex AI access** (`roles/aiplatform.user`) in a project where the Claude models are enabled;
+   - **The Anthropic API** (`RIYU_AI_PROVIDER=anthropic`): a plain **Anthropic API key** (`sk-ant-…`).
 
 ### 5.b Enabling riyu
 
-At installation time, in `configuration/kawa.config`:
+At installation time, in `configuration/kawa.config` — with Vertex AI:
 
 ```bash
 USE_RIYU=true
+RIYU_AI_PROVIDER="vertex"
 RIYU_GCP_KEY_PATH="/path/to/service-account.json"   # copied next to the compose file
 RIYU_GCP_PROJECT="my-gcp-project"
 RIYU_GCP_LOCATION="global"
 RIYU_EXTERNAL_URL="https://riyu.wayne.com"          # the URL users type; /auth/callback is derived from it
 ```
 
-The models are configurable (`RIYU_SMALL/MEDIUM/LARGE_MODEL`), with sensible Claude-on-Vertex defaults. An optional `UNSPLASH_API_KEY` (in `kawa.secrets`) enables image search.
+or with the Anthropic API:
+
+```bash
+USE_RIYU=true
+RIYU_AI_PROVIDER="anthropic"
+RIYU_EXTERNAL_URL="https://riyu.wayne.com"
+```
+```bash
+# in configuration/kawa.secrets:
+ANTHROPIC_API_KEY="sk-ant-..."
+```
+
+The models are configurable (`RIYU_SMALL/MEDIUM/LARGE_MODEL`); left empty, they default to the Claude models of the chosen provider (the provider is carried by the model id prefix: `google-vertex-anthropic/…` or `anthropic/…`). An optional `UNSPLASH_API_KEY` (in `kawa.secrets`) enables image search.
 
 Then install in docker mode: the installer validates the requirements, copies the GCP key, prepares the riyu state directory (`docker/riyu-db`) and starts riyu through the `riyu` compose profile (persisted in `docker/.env` via `COMPOSE_PROFILES`). Riyu is served on port **8043**.
 

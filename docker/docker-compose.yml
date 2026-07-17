@@ -83,11 +83,14 @@ services:
       UNSPLASH_ACCESS_KEY: ${UNSPLASH_API_KEY}
       KAWA_URL: http://kawa-server:8080
       KAWA_ARTIFACT_API_URL: http://kawa-server:8082
-      # Models (Vertex AI is the only supported provider for now)
+      # Models. The provider comes from the model prefix:
+      # google-vertex-anthropic/ (Vertex AI) or anthropic/ (Anthropic API)
       SMALL_MODEL: ${RIYU_SMALL_MODEL}
       MEDIUM_MODEL: ${RIYU_MEDIUM_MODEL}
       LARGE_MODEL: ${RIYU_LARGE_MODEL}
-      # GCP
+      # Anthropic API (RIYU_AI_PROVIDER=anthropic)
+      ANTHROPIC_API_KEY: ${ANTHROPIC_API_KEY}
+      # GCP (RIYU_AI_PROVIDER=vertex)
       GOOGLE_CLOUD_PROJECT: ${RIYU_GCP_PROJECT}
       GOOGLE_CLOUD_LOCATION: ${RIYU_GCP_LOCATION}
       GOOGLE_APPLICATION_CREDENTIALS: /home/kawa/.gcp/service-account.json
