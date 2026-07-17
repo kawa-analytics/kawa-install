@@ -8,6 +8,10 @@
 
 cd "$(dirname "$0")/.."
 
+# Never let a package post-install script block on a prompt (the
+# clickhouse-server postinst asks for a password otherwise)
+export DEBIAN_FRONTEND=noninteractive
+
 KAWA_USER=kawa-system
 CONFIG_DIR=/etc/kawa
 LOG_DIR=/var/log/kawa
