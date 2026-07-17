@@ -116,6 +116,19 @@ $APT_INSTALL \
 # fall back to the distribution default (eg. 18 on Ubuntu 26.04)
 $APT_INSTALL postgresql-16 2>/dev/null || $APT_INSTALL postgresql
 
+# The script runner MUST run on python 3.12: user scripts pin package
+# versions (scipy, scikit-learn...) that only ship wheels up to 3.12 -
+# on a newer python, pip falls back to endless source builds.
+# Try the distribution package, else install a standalone 3.12 with uv.
+if ! command -v python3.12 >/dev/null 2>&1; then
+    $APT_INSTALL python3.12 python3.12-venv 2>/dev/null || true
+fi
+if ! command -v python3.12 >/dev/null 2>&1; then
+    echo "No python3.12 in the distribution: installing a standalone one with uv"
+    curl -LsSf https://astral.sh/uv/install.sh | env UV_INSTALL_DIR=/usr/local/bin sh
+    sudo -u $KAWA_USER /usr/local/bin/uv python install 3.12
+fi
+
 # ClickHouse repository. The key file published on packages.clickhouse.com
 # misses the 2022 signing subkey (3E4AD4719DDE9A38): fetch the full key
 # from the ubuntu keyserver over plain HTTPS (works without dirmngr, and

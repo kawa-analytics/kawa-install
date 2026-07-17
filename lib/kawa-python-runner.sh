@@ -24,9 +24,15 @@ if [ "$USE_CUSTOM_PYPI" = "true" ]; then
     export PIP_INDEX_URL
 fi
 
+# The runner and pex MUST use python 3.12: user scripts pin package
+# versions that only ship prebuilt wheels up to 3.12. The interpreter
+# comes from the distribution, or from uv (installed by install.sh).
+RUNNER_PYTHON=$(command -v python3.12 || uv python find 3.12 2>/dev/null || command -v python3)
+echo "Using python interpreter: $RUNNER_PYTHON"
+
 # Both packages are on the public PyPI (or your custom registry):
 # https://pypi.org/project/kawapythonserver/
-pipx install pex
-pipx install kawapythonserver
+pipx install --python "$RUNNER_PYTHON" pex
+pipx install --python "$RUNNER_PYTHON" kawapythonserver
 
 kawapythonserver > $LOG_DIR/kawapythonserver.log 2>&1
