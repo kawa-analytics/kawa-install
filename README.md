@@ -48,7 +48,7 @@ sudo systemctl restart kawa                            # native mode
   ```bash
   sudo apt-get update && sudo apt-get install -y git
   ```
-  The runtime requirements are **JDK 21 (LTS)** for the KAWA server and workflow engine, and **Python 3.12 or above** for the script runner. On Ubuntu the installer installs them for you through APT (along with Postgres and ClickHouse); on other distributions, install them beforehand.
+  The runtime requirements are **JDK 21 (LTS)** for the KAWA server and workflow engine, and **Python 3.12** for the script runner (user scripts pin package versions whose prebuilt wheels stop at 3.12 — a newer interpreter forces endless source builds). The installer sets everything up through APT (along with Postgres and ClickHouse), and provisions a standalone Python 3.12 via `uv` when the distribution does not ship it.
 - **docker mode**: any Linux with an account with sudo, plus git, docker + docker compose, python3 with venv, and openssl. On Ubuntu:
   ```bash
   sudo apt-get update && sudo apt-get install -y git docker.io docker-compose-v2 python3-venv openssl
