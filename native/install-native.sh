@@ -102,14 +102,17 @@ ARCH=$(dpkg --print-architecture)
 echo "deb [signed-by=/usr/share/keyrings/clickhouse-keyring.gpg arch=${ARCH}] https://packages.clickhouse.com/deb stable main" | sudo tee /etc/apt/sources.list.d/clickhouse.list
 sudo apt-get update
 sudo apt-get install -yqq \
-    postgresql-16 \
     clickhouse-server \
     clickhouse-client \
     openjdk-21-jre-headless \
-    python3.12 \
+    python3 \
     python3-pip \
-    python3.12-venv \
+    python3-venv \
     pipx
+
+# Postgres: prefer 16 when the distribution ships it, otherwise
+# fall back to the distribution default (eg. 18 on Ubuntu 26.04)
+sudo apt-get install -yqq postgresql-16 2>/dev/null || sudo apt-get install -yqq postgresql
 
 # Configure Postgres: Add the kawa user and grant them the required permissions
 echo "Creating KAWA user in Postgres"
@@ -129,7 +132,10 @@ echo "Creating KAWA user in Clickhouse"
 sudo service clickhouse-server start
 sudo sed -i '/access_management/ s/<!--//' /etc/clickhouse-server/users.xml
 sudo sed -i '/access_management/ s/-->//' /etc/clickhouse-server/users.xml
-clickhouse-client --password --multiquery -q "CREATE USER kawa IDENTIFIED WITH sha256_password BY '$(cat $CONFIG_DIR/kawa.pwd)'; CREATE DATABASE kawa; GRANT ALL ON kawa TO kawa; GRANT ALL ON kawa.* TO kawa;"
+# When apt ran non-interactively, the clickhouse default user has no
+# password: try without a password first, then prompt.
+CLICKHOUSE_DDL="CREATE USER IF NOT EXISTS kawa IDENTIFIED WITH sha256_password BY '$(cat $CONFIG_DIR/kawa.pwd)'; CREATE DATABASE IF NOT EXISTS kawa; GRANT ALL ON kawa TO kawa; GRANT ALL ON kawa.* TO kawa;"
+clickhouse-client --multiquery -q "$CLICKHOUSE_DDL" 2>/dev/null || clickhouse-client --password --multiquery -q "$CLICKHOUSE_DDL"
 
 # =====================================================================
 # STEP 2: Start all the services
