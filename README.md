@@ -44,10 +44,11 @@ sudo systemctl restart kawa                            # native mode
 - A **GitLab registry token** (token name + token value), provided by the KAWA support team. It gives access to the docker images (docker mode) and the JARs (native mode). The script runner python package comes from the public PyPI: [kawapythonserver](https://pypi.org/project/kawapythonserver/).
 - A valid **KAWA license**.
 - Outbound network access to `gitlab.com`, `registry.gitlab.com`, `pypi.org` — or your private python package registry, see section 3.e (and `packages.clickhouse.com` in native mode).
-- **native mode**: Ubuntu 20.04, 22.04 or 24.04 LTS (AMD64), an account with sudo, and `git` to clone this package (everything else is installed by the installer):
+- **native mode**: Ubuntu 20.04, 22.04 or 24.04 LTS (AMD64), an account with sudo, and `git` to clone this package:
   ```bash
   sudo apt-get update && sudo apt-get install -y git
   ```
+  The runtime requirements are **JDK 21 (LTS)** for the KAWA server and workflow engine, and **Python 3.12 or above** for the script runner. On Ubuntu the installer installs them for you through APT (along with Postgres and ClickHouse); on other distributions, install them beforehand.
 - **docker mode**: any Linux with an account with sudo, plus git, docker + docker compose, python3 with venv, and openssl. On Ubuntu:
   ```bash
   sudo apt-get update && sudo apt-get install -y git docker.io docker-compose-v2 python3-venv openssl
