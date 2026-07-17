@@ -1,6 +1,6 @@
 # KAWA Installation
 
-This package installs the **KAWA platform** on a single machine — the simple standalone install: **ClickHouse + Postgres**, **no Riyu (AI co-builder)**, AI features completely disabled.
+This package installs the **KAWA platform** on a single machine — the simple standalone install: **ClickHouse + Postgres**. The base install ships with AI features completely disabled; **Riyu, the AI co-builder, is an optional add-on** (docker mode only, requires OIDC and Google Vertex AI — see section 5).
 
 Two installation modes are available in the same package — pick the one that fits your environment:
 
@@ -10,6 +10,7 @@ Two installation modes are available in the same package — pick the one that f
 | Postgres / ClickHouse | Installed from APT packages | Official docker images |
 | KAWA server & workflow engine | Standalone JARs from the KAWA registry | Docker images from the KAWA registry |
 | Script runner | `kawapythonserver` python package | Docker image |
+| Riyu (AI co-builder) | Not available | Optional (requires OIDC + Vertex AI) |
 | Version format | Exact JAR version (eg. `1.35.1`) | Image tag, branch form (eg. `1.35.x`) |
 | Requires | Ubuntu 20.04/22.04/24.04 LTS, root access | Any Linux with docker + docker compose |
 
@@ -298,20 +299,79 @@ sudo docker compose restart kawa-server
 
 The generated `docker/.env` holds this installation's environment (secrets included) — never delete or regenerate it on an existing installation.
 
-For backups, cover the data directory chosen at install time (`pgdata`, `clickhousedata`, `kawadata`) and `docker/.env`.
+For backups, cover the data directory chosen at install time (`pgdata`, `clickhousedata`, `kawadata`), `docker/.env`, and `docker/riyu-db` when riyu is enabled.
 
 __Upgrading__: edit `KAWA_BRANCH_NAME` in `docker/.env`, then:
 
 ```bash
 cd docker
 sudo docker compose pull
-sudo docker compose --profile clickhouse up -d
+sudo docker compose up -d
 ```
 
 
-## 5. What is intentionally NOT in this deployment
+## 5. Riyu - the AI co-builder (docker mode only)
 
-- **Riyu (AI co-builder) and all AI features** — no AI components, no LLM credentials, no identity provider required. The `OpenAiConfiguration` is kept deactivated by the configure step.
+Riyu is KAWA's AI co-builder. It runs as an additional docker compose service, with its own web UI. It is optional and disabled by default.
+
+> **⚠ OIDC is MANDATORY for riyu.** Riyu users authenticate on your identity
+> provider: the whole OIDC section of `kawa.config` must be filled in
+> (`USE_OIDC=true`), and the installer refuses to enable riyu without it.
+
+### 5.a Requirements
+
+1. **OIDC configured** (section 3.b), plus one extra step on your identity provider: register the additional redirect URI **`<RIYU_EXTERNAL_URL>/auth/callback`** (e.g. `https://riyu.wayne.com/auth/callback`) on the same OIDC application.
+2. **A GCP service account key** (json file) with **Vertex AI access** (`roles/aiplatform.user`) in a project where the Claude models are enabled. Google Vertex AI is the only supported AI provider for now.
+
+### 5.b Enabling riyu
+
+At installation time, in `configuration/kawa.config`:
+
+```bash
+USE_RIYU=true
+RIYU_GCP_KEY_PATH="/path/to/service-account.json"   # copied next to the compose file
+RIYU_GCP_PROJECT="my-gcp-project"
+RIYU_GCP_LOCATION="global"
+RIYU_EXTERNAL_URL="https://riyu.wayne.com"          # the URL users type; /auth/callback is derived from it
+```
+
+The models are configurable (`RIYU_SMALL/MEDIUM/LARGE_MODEL`), with sensible Claude-on-Vertex defaults. An optional `UNSPLASH_API_KEY` (in `kawa.secrets`) enables image search.
+
+Then install in docker mode: the installer validates the requirements, copies the GCP key, prepares the riyu state directory (`docker/riyu-db`) and starts riyu through the `riyu` compose profile (persisted in `docker/.env` via `COMPOSE_PROFILES`). Riyu is served on port **8043**.
+
+What riyu adds to the deployment:
+
+- the **riyu** service itself (image `kawa-dsl`, port 8043);
+- the **KAWA artifact API** exposed on port **8082** (see section 6);
+- a shared **skills** directory (`docker/riyu-db/skills`), mounted read-only in the script runner so that skills authored in riyu are available to scripts;
+- the `docker/riyu-db` state directory (sessions, agents, artifacts) — **include it in your backups**.
+
+Riyu does not change the KAWA-side AI configuration: the `OpenAiConfiguration` stays deactivated; riyu brings its own models through Vertex AI.
+
+## 6. Network ports
+
+What the installation exposes, and what to open on your firewall:
+
+| Port | Service | Exposed | Open to users? |
+|------|---------|---------|----------------|
+| 8080 | KAWA web UI + API | Always | **Yes** — this is the main entry point |
+| 8082 | KAWA artifact API | Always in docker mode (serves the artifacts built in riyu) | **Yes when riyu is enabled** — users' browsers load artifacts from it (`ARTIFACT_EXTERNAL_URL`) |
+| 8043 | Riyu web UI | Only with riyu | **Yes when riyu is enabled** |
+| 8088 | Workflow engine | Internal | No — only the KAWA server talks to it |
+| 8815 | Script runner | Internal | No — only the KAWA server talks to it |
+| 5432 / 8123 / 9000 | Postgres / ClickHouse | Internal | No |
+
+> **⚠ New in this version:** docker mode now maps port **8082** (the artifact
+> API) on the host. If you enable riyu, open it alongside 8080 and 8043 and
+> set `ARTIFACT_EXTERNAL_URL` to the URL where browsers can reach it. If you
+> do not use riyu, you can leave 8082 closed on the firewall.
+
+Ports 8088, 8815, 5432, 8123 and 9000 are mapped on the host for administration convenience — do not open them to users.
+
+## 7. What is intentionally NOT in this deployment
+
+- **AI features in the base install** — no LLM credentials required, and the `OpenAiConfiguration` is kept deactivated by the configure step. The optional riyu add-on (section 5) brings its own models through Vertex AI.
+- **Riyu in native mode** — riyu is only available with the docker installation.
 - **External warehouses** — this is the simple standalone install: always the bundled ClickHouse + Postgres.
 - **Other authentication mechanisms** — only native KAWA login and OIDC are supported (section 3.b).
 - **HTTPS termination by default** — enable it in `kawa.config` (section 3.c) or terminate TLS on a reverse proxy.

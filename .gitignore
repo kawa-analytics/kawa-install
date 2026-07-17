@@ -9,3 +9,5 @@ configuration/admin.pwd
 kywy-venv/
 __pycache__/
 configuration/kawa-registry.credentials
+docker/gcp.json
+docker/riyu-db/

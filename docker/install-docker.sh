@@ -75,6 +75,32 @@ if [ "$USE_CUSTOM_PYPI" == "true" ]; then
     KW_PEX_USE_PIP_CONFIG="true"
 fi
 
+# RIYU - the AI co-builder (optional). Requires OIDC and a GCP service
+# account key with Vertex AI access. Enabled through the "riyu"
+# compose profile (COMPOSE_PROFILES is persisted in .env).
+COMPOSE_PROFILES=""
+KAWA_ARTIFACT_EXTERNAL_URL=${ARTIFACT_EXTERNAL_URL:-http://localhost:8082}
+if [ "$USE_RIYU" == "true" ]; then
+    if [ "$USE_OIDC" != "true" ]; then
+        echo "USE_RIYU=true requires OIDC: please fill in the OIDC section of kawa.config (USE_OIDC=true)"
+        exit 1
+    fi
+    if [ ! -f "$RIYU_GCP_KEY_PATH" ]; then
+        echo "USE_RIYU=true requires a GCP service account key with Vertex AI access:"
+        echo "please set RIYU_GCP_KEY_PATH in kawa.config"
+        exit 1
+    fi
+    cp "$RIYU_GCP_KEY_PATH" ./gcp.json
+    chmod 644 ./gcp.json
+    COMPOSE_PROFILES="riyu"
+fi
+
+# The riyu state directory. The skills subdirectory is shared with the
+# script runner (mounted read-only there), so it always exists. The
+# containers write into it with their own user.
+mkdir -p riyu-db/skills riyu-db/opencode
+chmod -R 777 riyu-db
+
 KAWA_SERVICE_NAME="kawa-server"
 KAWA_SERVER_HTTPS=false
 KAWA_SERVER_URL=http://${KAWA_SERVICE_NAME}
@@ -152,7 +178,9 @@ done < .env.defaults
 # STEP 2: Start all the services
 # =====================================================================
 
-docker compose --profile clickhouse up -d
+# The active profiles (clickhouse, riyu...) are persisted in .env
+# through COMPOSE_PROFILES: plain docker compose commands see them.
+docker compose up -d
 
 # =====================================================================
 # STEP 3: Install kywy and apply the KAWA configuration
