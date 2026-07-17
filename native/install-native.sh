@@ -126,7 +126,9 @@ fi
 if ! command -v python3.12 >/dev/null 2>&1; then
     echo "No python3.12 in the distribution: installing a standalone one with uv"
     curl -LsSf https://astral.sh/uv/install.sh | env UV_INSTALL_DIR=/usr/local/bin sh
-    sudo -u $KAWA_USER /usr/local/bin/uv python install 3.12
+    # cd to a neutral directory: uv refuses to run from a directory
+    # the kawa-system user cannot read
+    sudo -u $KAWA_USER sh -c "cd / && /usr/local/bin/uv python install 3.12"
 fi
 
 # ClickHouse repository. The key file published on packages.clickhouse.com
