@@ -9,8 +9,10 @@
 cd "$(dirname "$0")/.."
 
 # Never let a package post-install script block on a prompt (the
-# clickhouse-server postinst asks for a password otherwise)
+# clickhouse-server postinst asks for a password otherwise).
+# NB: passed explicitly through sudo below, which resets the environment.
 export DEBIAN_FRONTEND=noninteractive
+APT_INSTALL="sudo DEBIAN_FRONTEND=noninteractive apt-get install -yqq"
 
 KAWA_USER=kawa-system
 CONFIG_DIR=/etc/kawa
@@ -99,11 +101,11 @@ chgrp $KAWA_USER $CONFIG_DIR/*.*
 chmod 600 $CONFIG_DIR/*.*
 
 # Install dependencies
-sudo apt-get install -y apt-transport-https ca-certificates dirmngr gnupg
+$APT_INSTALL apt-transport-https ca-certificates dirmngr gnupg
 
 # The JVM and the python toolchain first, independently from the
 # clickhouse repository (a repo failure must not take them down)
-sudo apt-get install -yqq \
+$APT_INSTALL \
     openjdk-21-jre-headless \
     python3 \
     python3-pip \
@@ -112,7 +114,7 @@ sudo apt-get install -yqq \
 
 # Postgres: prefer 16 when the distribution ships it, otherwise
 # fall back to the distribution default (eg. 18 on Ubuntu 26.04)
-sudo apt-get install -yqq postgresql-16 2>/dev/null || sudo apt-get install -yqq postgresql
+$APT_INSTALL postgresql-16 2>/dev/null || $APT_INSTALL postgresql
 
 # ClickHouse repository. The key file published on packages.clickhouse.com
 # misses the 2022 signing subkey (3E4AD4719DDE9A38): fetch the full key
@@ -125,7 +127,7 @@ sudo chmod 644 /usr/share/keyrings/clickhouse-keyring.gpg
 ARCH=$(dpkg --print-architecture)
 echo "deb [signed-by=/usr/share/keyrings/clickhouse-keyring.gpg arch=${ARCH}] https://packages.clickhouse.com/deb stable main" | sudo tee /etc/apt/sources.list.d/clickhouse.list
 sudo apt-get update
-sudo apt-get install -yqq clickhouse-server clickhouse-client
+$APT_INSTALL clickhouse-server clickhouse-client
 
 # Configure Postgres: Add the kawa user and grant them the required permissions
 echo "Creating KAWA user in Postgres"
