@@ -110,9 +110,12 @@ sudo apt-get install -yqq \
 # fall back to the distribution default (eg. 18 on Ubuntu 26.04)
 sudo apt-get install -yqq postgresql-16 2>/dev/null || sudo apt-get install -yqq postgresql
 
-# ClickHouse repository. The published key file misses the 2022 signing
-# subkey (3E4AD4719DDE9A38): import the full key from the keyserver.
-sudo gpg --no-default-keyring --keyring /usr/share/keyrings/clickhouse-keyring.gpg --keyserver hkps://keyserver.ubuntu.com --recv-keys 3A9EA1193A97B548BE1457D48919F6BD2B48D754
+# ClickHouse repository. The key file published on packages.clickhouse.com
+# misses the 2022 signing subkey (3E4AD4719DDE9A38): fetch the full key
+# from the ubuntu keyserver over plain HTTPS (works without dirmngr, and
+# gpg --dearmor produces the keyring format apt expects).
+sudo rm -f /usr/share/keyrings/clickhouse-keyring.gpg
+curl -fsSL 'https://keyserver.ubuntu.com/pks/lookup?op=get&search=0x3A9EA1193A97B548BE1457D48919F6BD2B48D754' | sudo gpg --dearmor -o /usr/share/keyrings/clickhouse-keyring.gpg
 sudo chmod 644 /usr/share/keyrings/clickhouse-keyring.gpg
 
 ARCH=$(dpkg --print-architecture)
