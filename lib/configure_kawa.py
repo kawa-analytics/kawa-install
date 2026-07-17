@@ -60,18 +60,24 @@ def main():
 
     cmd = kawa.commands
 
-    # Features + email provider.
+    # Email provider + server config.
     # In docker mode the server always listens on 8080 inside its
     # container (SERVER_INTERNAL_PORT), whatever the exposed port is.
-    features = [f.strip() for f in env('ENABLED_FEATURES').split(',') if f.strip()]
     provider = env('COMMUNICATION_PROVIDER_TYPE', 'LOG')
     cmd.replace_configuration('StandaloneApiServerConfiguration', {
         'port': int(env('SERVER_INTERNAL_PORT') or port),
         'communicationProviderType': provider,
-        'enabledFeatures': features,
     })
-    print('- Enabled features: {}'.format(', '.join(features) or 'none'))
     print('- Email provider: {}'.format(provider))
+
+    # Features. They MUST be applied with ToggleFeature (which patches
+    # the enabledFeatures key of the stored payload): a plain
+    # ReplaceConfiguration does not persist them in a form the server
+    # can read back.
+    features = [f.strip() for f in env('ENABLED_FEATURES').split(',') if f.strip()]
+    for feature in features:
+        cmd.toggle_feature(feature, True)
+    print('- Enabled features: {}'.format(', '.join(features) or 'none'))
 
     # SMTP server. The credentials stay in the environment
     # (KAWA_SMTP_USERNAME / KAWA_SMTP_PASSWORD in kawa.env).
